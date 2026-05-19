@@ -87,6 +87,14 @@ const PopupApp = () => {
           <p className="mt-2 text-[11px] text-slate-400">
             Confianca {Math.round(selectedDetection.confidence * 100)}%.
           </p>
+          {selectedDetection.elementHtml && (
+            <details className="mt-3">
+              <summary className="cursor-pointer text-accent-300 text-xs">Ver código do elemento</summary>
+              <pre className="mt-2 max-h-48 overflow-auto rounded bg-zinc-900 p-2 text-xs text-slate-100 border border-zinc-700 whitespace-pre-wrap break-all">
+                {selectedDetection.elementHtml}
+              </pre>
+            </details>
+          )}
         </Card>
       ) : null}
     </main>

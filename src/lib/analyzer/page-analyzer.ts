@@ -22,7 +22,13 @@ export const analyzeCurrentPage = async (): Promise<AnalysisResult> => {
   const detections: Detection[] = classification.map((item, index) => {
     const elementId = heuristicResult.matchedElementIds[index] || heuristicResult.matchedElementIds[0]
     const matchedElement = elements.find((el) => el.id === elementId) || elements[0]
-
+    let elementHtml = ""
+    if (matchedElement && matchedElement.selector) {
+      const domEl = document.querySelector(matchedElement.selector)
+      if (domEl) {
+        elementHtml = domEl.outerHTML
+      }
+    }
     return {
       id: `${item.pattern}_${index}_${Date.now()}`,
       pattern: item.pattern,
@@ -32,7 +38,8 @@ export const analyzeCurrentPage = async (): Promise<AnalysisResult> => {
       suspicionScore: heuristicResult.suspicionScore,
       elementId,
       selector: matchedElement?.selector || "body",
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      elementHtml
     }
   })
 

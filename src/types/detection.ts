@@ -49,6 +49,7 @@ export interface Detection {
   elementId: string
   selector: string
   createdAt: number
+  elementHtml: string
 }
 
 export interface AnalysisResult {
