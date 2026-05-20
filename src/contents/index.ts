@@ -1,8 +1,35 @@
 import type { PlasmoCSConfig } from "plasmo"
 import { analyzeCurrentPage } from "../lib/analyzer/page-analyzer"
-import type { RuntimeMessage, RuntimeResponse } from "../types/messages"
-import { renderOverlay } from "./overlay"
+import type { RuntimeBasicResponse, RuntimeMessage, RuntimeResponse } from "../types/messages"
+import { focusDetection, renderOverlay } from "./overlay"
 import "./overlay.css"
+
+const isContextInvalidatedError = (value: unknown): boolean => {
+  const message =
+    value instanceof Error
+      ? value.message
+      : typeof value === "string"
+        ? value
+        : ""
+
+  return /extension context invalidated/i.test(message)
+}
+
+// During extension reload/update, stale content script promises may reject with
+// "Extension context invalidated". Ignore only this known transient case.
+window.addEventListener("unhandledrejection", (event) => {
+  if (isContextInvalidatedError(event.reason)) {
+    event.preventDefault()
+  }
+})
+
+window.addEventListener("error", (event) => {
+  const targetError = event.error ?? event.message
+
+  if (isContextInvalidatedError(targetError)) {
+    event.preventDefault()
+  }
+})
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
@@ -11,7 +38,25 @@ export const config: PlasmoCSConfig = {
 }
 
 chrome.runtime.onMessage.addListener(
-  (message: RuntimeMessage, _sender, sendResponse: (response: RuntimeResponse) => void) => {
+  (
+    message: RuntimeMessage,
+    _sender,
+    sendResponse: (response: RuntimeResponse | RuntimeBasicResponse) => void
+  ) => {
+    if (message.type === "CONTENT_FOCUS_DETECTION") {
+      const found = focusDetection(message.selector)
+
+      if (!found) {
+        sendResponse({ ok: false, error: "Elemento nao encontrado para foco" })
+        return false
+      }
+
+      sendResponse({
+        ok: true
+      })
+      return false
+    }
+
     if (message.type !== "CONTENT_ANALYZE") {
       return false
     }

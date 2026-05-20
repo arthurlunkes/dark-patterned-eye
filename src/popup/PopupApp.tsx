@@ -87,6 +87,12 @@ const PopupApp = () => {
           <p className="mt-2 text-[11px] text-slate-400">
             Confianca {Math.round(selectedDetection.confidence * 100)}%.
           </p>
+          <button
+            className="mt-3 rounded bg-accent-500 px-2.5 py-1.5 text-[11px] font-semibold text-ink-950 transition hover:bg-accent-400"
+            onClick={() => void setSelectedDetection(selectedDetection)}
+            type="button">
+            Ir para elemento
+          </button>
           {selectedDetection.elementHtml && (
             <details className="mt-3">
               <summary className="cursor-pointer text-accent-300 text-xs">Ver código do elemento</summary>

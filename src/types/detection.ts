@@ -30,6 +30,7 @@ export interface HeuristicResult {
   possiblePatterns: string[]
   reasons: string[]
   matchedElementIds: string[]
+  matchedElementIdsByPattern: Record<string, string[]>
 }
 
 export interface LLMClassification {

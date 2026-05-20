@@ -19,29 +19,49 @@ export const analyzeCurrentPage = async (): Promise<AnalysisResult> => {
     patternHints: heuristicResult.possiblePatterns
   })
 
-  const detections: Detection[] = classification.map((item, index) => {
-    const elementId = heuristicResult.matchedElementIds[index] || heuristicResult.matchedElementIds[0]
-    const matchedElement = elements.find((el) => el.id === elementId) || elements[0]
-    let elementHtml = ""
-    if (matchedElement && matchedElement.selector) {
-      const domEl = document.querySelector(matchedElement.selector)
-      if (domEl) {
-        elementHtml = domEl.outerHTML
+  const classificationByPattern = new Map(classification.map((item) => [item.pattern, item]))
+
+  const detections: Detection[] = []
+  const maxElementsPerPattern = 3
+  const now = Date.now()
+
+  for (const pattern of heuristicResult.possiblePatterns) {
+    const classifiedPattern = classificationByPattern.get(pattern)
+    if (!classifiedPattern) {
+      continue
+    }
+
+    const elementIdsForPattern = Array.from(new Set(heuristicResult.matchedElementIdsByPattern[pattern] || []))
+    const candidateElementIds =
+      elementIdsForPattern.length > 0
+        ? elementIdsForPattern.slice(0, maxElementsPerPattern)
+        : heuristicResult.matchedElementIds.slice(0, 1)
+
+    for (const [localIndex, elementId] of candidateElementIds.entries()) {
+      const matchedElement = elements.find((el) => el.id === elementId) || elements[0]
+
+      let elementHtml = ""
+      if (matchedElement?.selector) {
+        const domEl = document.querySelector(matchedElement.selector)
+        if (domEl) {
+          elementHtml = domEl.outerHTML
+        }
       }
+
+      detections.push({
+        id: `${classifiedPattern.pattern}_${localIndex}_${elementId}_${now}`,
+        pattern: classifiedPattern.pattern,
+        confidence: classifiedPattern.confidence,
+        severity: classifiedPattern.severity,
+        explanation: classifiedPattern.explanation,
+        suspicionScore: heuristicResult.suspicionScore,
+        elementId,
+        selector: matchedElement?.selector || "body",
+        createdAt: now,
+        elementHtml
+      })
     }
-    return {
-      id: `${item.pattern}_${index}_${Date.now()}`,
-      pattern: item.pattern,
-      confidence: item.confidence,
-      severity: item.severity,
-      explanation: item.explanation,
-      suspicionScore: heuristicResult.suspicionScore,
-      elementId,
-      selector: matchedElement?.selector || "body",
-      createdAt: Date.now(),
-      elementHtml
-    }
-  })
+  }
 
   return {
     detections,

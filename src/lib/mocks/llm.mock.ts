@@ -8,16 +8,28 @@ const mockPool: LLMClassification[] = [
     explanation: "A interface utiliza pressão temporal para acelerar decisões."
   },
   {
-    pattern: "confirmshaming",
-    confidence: 0.84,
+    pattern: "countdown_pressure",
+    confidence: 0.82,
     severity: "medium",
-    explanation: "O texto de recusa sugere culpa ou constrangimento para o usuário."
+    explanation: "Há sinal de contagem regressiva para apressar a decisão do usuário."
   },
   {
-    pattern: "forced_action",
-    confidence: 0.79,
+    pattern: "preselected_checkbox",
+    confidence: 0.87,
     severity: "medium",
-    explanation: "O fluxo incentiva uma ação obrigatória para concluir a tarefa."
+    explanation: "Uma opção relevante aparece pré-selecionada antes da escolha do usuário."
+  },
+  {
+    pattern: "attention_grabbing_overlay",
+    confidence: 0.76,
+    severity: "medium",
+    explanation: "Um overlay dominante pode direcionar a atenção de forma desproporcional."
+  },
+  {
+    pattern: "disproportionate_cta",
+    confidence: 0.74,
+    severity: "low",
+    explanation: "A CTA principal é visualmente muito mais forte que as alternativas."
   }
 ]
 

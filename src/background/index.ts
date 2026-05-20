@@ -1,12 +1,58 @@
-import type { AnalysisResult } from "../types/detection"
-import type { RuntimeMessage, RuntimeResponse } from "../types/messages"
+import type { AnalysisResult } from "../types/detection";
+import type { RuntimeBasicResponse, RuntimeMessage, RuntimeResponse } from "../types/messages";
 
 const resultByTab = new Map<number, AnalysisResult>()
 
+const isTransientTabMessageError = (message: string): boolean => {
+  return /back\/forward cache|context invalidated|receiving end does not exist|message channel is closed/i.test(
+    message
+  )
+}
+
+const sendMessageToTab = <T>(tabId: number, message: RuntimeMessage): Promise<{ response?: T; error?: string }> => {
+  return new Promise((resolve) => {
+    chrome.tabs.sendMessage(tabId, message, (response: T | undefined) => {
+      const runtimeError = chrome.runtime.lastError
+
+      if (runtimeError) {
+        resolve({ error: runtimeError.message })
+        return
+      }
+
+      resolve({ response })
+    })
+  })
+}
+
+const sendMessageToTabWithRetry = async <T>(
+  tabId: number,
+  message: RuntimeMessage,
+  retries = 1
+): Promise<{ response?: T; error?: string }> => {
+  const firstAttempt = await sendMessageToTab<T>(tabId, message)
+
+  if (!firstAttempt.error) {
+    return firstAttempt
+  }
+
+  if (retries <= 0 || !isTransientTabMessageError(firstAttempt.error)) {
+    return firstAttempt
+  }
+
+  return sendMessageToTab<T>(tabId, message)
+}
+
 const runAnalysisInTab = async (tabId: number): Promise<RuntimeResponse> => {
-  const response = (await chrome.tabs.sendMessage(tabId, {
+  const { response, error } = await sendMessageToTabWithRetry<RuntimeResponse>(tabId, {
     type: "CONTENT_ANALYZE"
-  } satisfies RuntimeMessage)) as RuntimeResponse | undefined
+  } satisfies RuntimeMessage)
+
+  if (error) {
+    return {
+      ok: false,
+      error
+    }
+  }
 
   if (!response) {
     return {
@@ -26,7 +72,7 @@ chrome.runtime.onMessage.addListener(
   (
     message: RuntimeMessage,
     _sender,
-    sendResponse: (response: RuntimeResponse) => void
+    sendResponse: (response: RuntimeResponse | RuntimeBasicResponse) => void
   ) => {
     if (message.type === "POPUP_RUN_ANALYSIS") {
       ;(async () => {
@@ -37,6 +83,39 @@ chrome.runtime.onMessage.addListener(
           sendResponse({
             ok: false,
             error: error instanceof Error ? error.message : "Erro ao executar analise"
+          })
+        }
+      })()
+
+      return true
+    }
+
+    if (message.type === "POPUP_FOCUS_DETECTION") {
+      ;(async () => {
+        try {
+          const { response, error } = await sendMessageToTabWithRetry<RuntimeBasicResponse>(
+            message.tabId,
+            {
+              type: "CONTENT_FOCUS_DETECTION",
+              selector: message.selector
+            }
+          )
+
+          if (error) {
+            sendResponse({ ok: false, error })
+            return
+          }
+
+          if (!response?.ok) {
+            sendResponse({ ok: false, error: "Falha ao focar deteccao" })
+            return
+          }
+
+          sendResponse({ ok: true })
+        } catch (error) {
+          sendResponse({
+            ok: false,
+            error: error instanceof Error ? error.message : "Erro ao focar deteccao"
           })
         }
       })()

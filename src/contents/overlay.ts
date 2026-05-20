@@ -1,12 +1,18 @@
 import type { Detection } from "../types/detection"
 
 const ROOT_ID = "dp-eye-root"
+const FOCUS_RING_CLASS = "dp-eye-focus-ring"
+
+let isTrackingPositions = false
+let pendingPositionUpdate = false
 
 const clearOverlay = () => {
   const root = document.getElementById(ROOT_ID)
   if (root) {
     root.remove()
   }
+
+  stopPositionTracking()
 }
 
 const ensureOverlayRoot = () => {
@@ -19,6 +25,72 @@ const ensureOverlayRoot = () => {
   }
 
   return root
+}
+
+const updateHighlightPositions = () => {
+  const root = document.getElementById(ROOT_ID)
+  if (!root) {
+    return
+  }
+
+  const boxes = root.querySelectorAll<HTMLElement>(".dp-eye-highlight[data-selector]")
+
+  for (const box of boxes) {
+    const selector = box.dataset.selector
+    if (!selector) {
+      continue
+    }
+
+    const target = document.querySelector(selector) as HTMLElement | null
+    if (!target) {
+      box.style.display = "none"
+      continue
+    }
+
+    const rect = target.getBoundingClientRect()
+    if (rect.width <= 0 || rect.height <= 0) {
+      box.style.display = "none"
+      continue
+    }
+
+    box.style.display = "block"
+    box.style.left = `${rect.left}px`
+    box.style.top = `${rect.top}px`
+    box.style.width = `${rect.width}px`
+    box.style.height = `${rect.height}px`
+  }
+}
+
+const requestPositionUpdate = () => {
+  if (pendingPositionUpdate) {
+    return
+  }
+
+  pendingPositionUpdate = true
+  window.requestAnimationFrame(() => {
+    pendingPositionUpdate = false
+    updateHighlightPositions()
+  })
+}
+
+const startPositionTracking = () => {
+  if (isTrackingPositions) {
+    return
+  }
+
+  isTrackingPositions = true
+  window.addEventListener("scroll", requestPositionUpdate, { passive: true })
+  window.addEventListener("resize", requestPositionUpdate)
+}
+
+const stopPositionTracking = () => {
+  if (!isTrackingPositions) {
+    return
+  }
+
+  isTrackingPositions = false
+  window.removeEventListener("scroll", requestPositionUpdate)
+  window.removeEventListener("resize", requestPositionUpdate)
 }
 
 export const renderOverlay = (detections: Detection[]) => {
@@ -43,8 +115,9 @@ export const renderOverlay = (detections: Detection[]) => {
 
     const box = document.createElement("div")
     box.className = "dp-eye-highlight"
-    box.style.left = `${rect.left + window.scrollX}px`
-    box.style.top = `${rect.top + window.scrollY}px`
+    box.dataset.selector = detection.selector
+    box.style.left = `${rect.left}px`
+    box.style.top = `${rect.top}px`
     box.style.width = `${rect.width}px`
     box.style.height = `${rect.height}px`
 
@@ -99,4 +172,37 @@ export const renderOverlay = (detections: Detection[]) => {
     box.appendChild(codePopover)
     root.appendChild(box)
   }
+
+  startPositionTracking()
+  requestPositionUpdate()
+}
+
+export const focusDetection = (selector: string): boolean => {
+  const target = document.querySelector(selector) as HTMLElement | null
+  if (!target) {
+    return false
+  }
+
+  target.scrollIntoView({
+    behavior: "smooth",
+    block: "center",
+    inline: "center"
+  })
+
+  const root = ensureOverlayRoot()
+  const rect = target.getBoundingClientRect()
+
+  const ring = document.createElement("div")
+  ring.className = `${FOCUS_RING_CLASS} dp-eye-highlight`
+  ring.style.left = `${rect.left}px`
+  ring.style.top = `${rect.top}px`
+  ring.style.width = `${rect.width}px`
+  ring.style.height = `${rect.height}px`
+  root.appendChild(ring)
+
+  window.setTimeout(() => {
+    ring.remove()
+  }, 1800)
+
+  return true
 }
